@@ -20,7 +20,7 @@ async def _stream_response(request: ChatRequest) -> StreamingResponse:
     history = await load_context(redis, request.session_id)
 
     try:
-        intent = await classify_intent(request.message)
+        intent = await classify_intent(request.message, history=history)
     except RuntimeError as e:
         if "RESOURCE_EXHAUSTED" in str(e):
             raise HTTPException(

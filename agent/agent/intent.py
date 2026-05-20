@@ -13,18 +13,26 @@ Classify the user question into one of these intents:
 - unknown: out of scope (weather, general knowledge, etc.)
 
 Also extract entities: resource types, regions, filters mentioned.
+If the question is a follow-up (uses pronouns like "they", "those", "it", "them") use the conversation history to infer the resource type.
 
 Respond with valid JSON only. Example:
 {{"intent": "resource_query", "entities": {{"resource_type": "aws_ec2_instance", "region": "us-east-1"}}}}
 
-Question: {question}
+{history_block}Question: {question}
 """
 
 
-async def classify_intent(question: str) -> Intent:
+async def classify_intent(question: str, history: list | None = None) -> Intent:
     model = get_aql_model()
+    history_block = ""
+    if history:
+        recent = history[-4:]  # last 2 turns (user+assistant pairs)
+        lines = "\n".join(f"{m.role}: {m.content[:200]}" for m in recent)
+        history_block = f"Recent conversation:\n{lines}\n\n"
     try:
-        response = model.generate_content(_INTENT_PROMPT.format(question=question))
+        response = model.generate_content(
+            _INTENT_PROMPT.format(question=question, history_block=history_block)
+        )
     except Exception as e:
         err = str(e)
         if "RESOURCE_EXHAUSTED" in err or "quota" in err.lower():
