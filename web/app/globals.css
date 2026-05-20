@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@layer base {
+  * {
+    @apply border-surface-border;
+  }
+  body {
+    @apply bg-surface text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-muted rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-600; }
+}
+
+@layer utilities {
+  /* ── Text ── */
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-500 via-violet-400 to-purple-400 bg-clip-text text-transparent;
+  }
+  .text-gradient-subtle {
+    @apply bg-gradient-to-r from-gray-100 to-gray-300 bg-clip-text text-transparent;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-surface-card border border-surface-border rounded-xl;
+  }
+  .card-glass {
+    @apply bg-white/[0.03] backdrop-blur-md border border-white/[0.06] rounded-2xl;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-gray-700 hover:bg-surface-card/80 hover:shadow-lg hover:shadow-black/20;
+  }
+  .card-glow {
+    @apply card shadow-glow transition-all duration-300;
+  }
+
+  /* ── Glow effects ── */
+  .glow-brand {
+    box-shadow: 0 0 24px -4px rgba(79, 110, 247, 0.4);
+  }
+  .glow-brand-sm {
+    box-shadow: 0 0 12px -2px rgba(79, 110, 247, 0.3);
+  }
+  .shadow-glow {
+    box-shadow: 0 0 0 1px rgba(79, 110, 247, 0.1), 0 4px 24px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ── Input ── */
+  .input-base {
+    @apply w-full bg-surface-card border border-surface-border text-white placeholder-gray-600
+           rounded-xl px-4 py-3 text-sm outline-none
+           hover:border-gray-600
+           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15
+           transition-all duration-200;
+  }
+
+  /* ── Streaming cursor ── */
+  .streaming-cursor::after {
+    content: "▋";
+    @apply animate-pulse text-brand-500 ml-0.5;
+  }
+
+  /* ── Gradient orb ── */
+  .orb {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+  }
+
+  /* ── Shimmer ── */
+  .shimmer {
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.04) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  /* ── Badge ── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium
+           bg-brand-500/10 border border-brand-500/25 text-brand-400;
+  }
+
+  /* ── Button variants ── */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600
+           text-white font-semibold px-5 py-2.5 rounded-xl
+           transition-all duration-200 hover:shadow-lg hover:shadow-brand-500/20
+           active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 border border-surface-border hover:border-gray-600
+           text-gray-300 hover:text-white font-medium px-5 py-2.5 rounded-xl
+           transition-all duration-200 hover:bg-surface-card/50;
+  }
+
+  /* ── Noise overlay ── */
+  .noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0.4;
+  }
+
+  /* ── Grid pattern ── */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(79, 110, 247, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 110, 247, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  70% { transform: scale(1.05); opacity: 0; }
+  100% { transform: scale(0.95); opacity: 0; }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
