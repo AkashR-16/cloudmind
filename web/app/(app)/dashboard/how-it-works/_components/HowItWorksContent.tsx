@@ -17,19 +17,25 @@ const ARCH = [
         icon: Server,
         label: "Floci",
         sublabel: "localhost:4566",
-        desc: "Simulates real AWS APIs — EC2, S3, VPC, IAM, RDS — without an AWS account. Acts as a local cloud endpoint.",
+        desc: "Runs as a Docker container, simulating 47 real AWS APIs (EC2, S3, VPC, IAM, RDS, Lambda) locally. No real AWS account needed.",
       },
       {
         icon: GitBranch,
-        label: "FixInventory",
-        sublabel: "fixcore + fixworker",
-        desc: "Scans Floci via boto3, discovers every resource and relationship, and writes a graph into ArangoDB.",
+        label: "fixworker",
+        sublabel: "FixInventory · AWS_ENDPOINT_URL",
+        desc: "FixInventory's collector runs in Docker, pointed at Floci via AWS_ENDPOINT_URL=http://floci:4566. Uses fake credentials — never contacts real AWS.",
+      },
+      {
+        icon: Shield,
+        label: "fixcore",
+        sublabel: "FixInventory · :8900",
+        desc: "FixInventory's graph API orchestrates collection. Receives resource data from fixworker and writes it to ArangoDB using FixInventory's native schema.",
       },
       {
         icon: Database,
         label: "ArangoDB",
-        sublabel: "ArangoCloud · fix/fix",
-        desc: "Stores the infrastructure graph. Vertex collection: fix (26 nodes). Edge collection: fix_default (15 edges). Queried via AQL.",
+        sublabel: "db=fix · vertices=fix · edges=fix_default",
+        desc: "Stores the FixInventory resource graph. Each AWS resource is a vertex; relationships (VPC→Subnet→EC2) are directed edges. Queried via AQL.",
       },
     ],
   },
@@ -107,12 +113,13 @@ export function HowItWorksContent() {
         <div>
           <div className="badge mb-4">
             <Zap className="w-3 h-3" />
-            Gemini 3.1 · FixInventory · ArangoDB · Redis · FastAPI · Next.js
+            Floci · fixworker · fixcore · ArangoDB · Gemini · FastAPI · Next.js
           </div>
           <h1 className="text-3xl font-bold mb-2">How CloudMind works</h1>
           <p className="text-gray-500 text-sm max-w-xl">
-            A full-stack AI agent that discovers your AWS environment, stores it as a graph,
-            and answers questions in plain English — with memory for follow-ups.
+            FixInventory discovers your AWS environment from Floci (a local AWS simulator),
+            persists it as a graph in ArangoDB, and a Gemini-powered AI agent answers
+            questions in plain English — with memory for follow-ups.
           </p>
         </div>
 
@@ -132,7 +139,7 @@ export function HowItWorksContent() {
         <section>
           <div className="flex items-center gap-2 mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Request flow — one question, six hops</h2>
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Query flow — one question, six hops</h2>
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             {FLOW_STEPS.map((step, i) => (
@@ -193,6 +200,40 @@ export function HowItWorksContent() {
           </div>
         </section>
 
+        {/* ── Discovery pipeline ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Discovery pipeline — Floci → FixInventory → ArangoDB</h2>
+          </div>
+          <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.03] p-4 space-y-3 text-xs font-mono text-gray-400">
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">1.</span>
+              <span><span className="text-white">Floci</span> starts as a Docker container on <span className="text-orange-300">:4566</span> — simulates EC2, S3, VPC, IAM, RDS, Lambda locally</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">2.</span>
+              <span><span className="text-white">seed_floci.py</span> creates 20+ AWS resources inside Floci using boto3 pointed at localhost:4566</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">3.</span>
+              <span><span className="text-white">fixworker</span> (FixInventory) starts with <span className="text-orange-300">AWS_ENDPOINT_URL=http://floci:4566</span> — all boto3 calls hit Floci, never real AWS</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">4.</span>
+              <span><span className="text-white">fixworker</span> discovers every resource and relationship, sends them to <span className="text-white">fixcore</span> over a secure PSK-authenticated channel</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">5.</span>
+              <span><span className="text-white">fixcore</span> writes the graph to ArangoDB: <span className="text-orange-300">db=fix</span>, vertices=<span className="text-orange-300">fix</span>, edges=<span className="text-orange-300">fix_default</span></span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-orange-400 shrink-0">6.</span>
+              <span>FastAPI agent queries ArangoDB via AQL and answers questions in plain English using Gemini</span>
+            </div>
+          </div>
+        </section>
+
         {/* ── Tech stack ── */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -201,10 +242,10 @@ export function HowItWorksContent() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { label: "Gemini 3.1 Flash Lite", sub: "AI model" },
+              { label: "Floci", sub: "Local AWS simulator" },
+              { label: "fixworker + fixcore", sub: "FixInventory discovery" },
               { label: "ArangoDB", sub: "Graph database" },
-              { label: "FixInventory", sub: "Cloud discovery" },
-              { label: "Floci", sub: "AWS simulator" },
+              { label: "Gemini 3.1 Flash Lite", sub: "AI model" },
               { label: "FastAPI + Uvicorn", sub: "Backend API" },
               { label: "Upstash Redis", sub: "Session store" },
               { label: "Next.js 14", sub: "Frontend" },

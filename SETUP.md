@@ -3,14 +3,20 @@
 ## Architecture
 
 ```
-Floci (local AWS simulator on :4566)
-  └─ seed_floci.py  → creates EC2, S3, VPC, RDS, Lambda, IAM inside Floci
-  └─ discover.py    → reads from Floci via boto3, writes to ArangoDB
-                       using FixInventory's exact schema (db=fix, graph=fix)
-ArangoDB (local :8529)
-  └─ uvicorn main:app  → AI agent queries graph, answers questions
-Redis (local :6379)
-  └─ multi-turn session context
+Floci (local AWS simulator :4566)
+  └─ seed_floci.py    → creates EC2, S3, VPC, RDS, Lambda, IAM inside Floci
+
+FixInventory (https://fixinventory.org/)
+  └─ fixworker        → scans Floci via boto3 (AWS_ENDPOINT_URL=http://floci:4566)
+                         no real AWS credentials needed
+  └─ fixcore          → receives discovered resources, persists to ArangoDB
+                         schema: db=fix, graph=fix, vertices=fix, edges=fix_default
+
+ArangoDB (:8529)
+  └─ uvicorn main:app → AI agent queries graph with AQL, streams answers via Gemini
+
+Redis (:6379)
+  └─ multi-turn session context (up to 10 turns, 24 h TTL)
 ```
 
 ## Prerequisites
@@ -22,24 +28,33 @@ Redis (local :6379)
 
 ---
 
-## Step 1 — Start ArangoDB, Redis, and Floci
+## Step 1 — Start all infrastructure services
 
 ```bash
 cd cloudmind/agent
 docker compose up -d
 ```
 
-This starts three containers:
+This starts **five** containers:
 
-| Service  | Port | Purpose |
-|----------|------|---------|
-| ArangoDB | 8529 | Graph database (FixInventory schema) |
-| Redis    | 6379 | Session context cache |
-| Floci    | 4566 | Local AWS environment simulator (47 services) |
+| Service    | Port | Purpose |
+|------------|------|---------|
+| ArangoDB   | 8529 | Graph database — stores the FixInventory resource graph |
+| Redis      | 6379 | Session context cache for multi-turn conversations |
+| Floci      | 4566 | Local AWS simulator (47 services, no real AWS needed) |
+| fixcore    | 8900 | FixInventory core — graph API + collection orchestrator |
+| fixworker  | —    | FixInventory worker — discovers resources from Floci |
 
-Wait ~15 seconds for Floci to finish initialising, then verify:
+**Startup sequence** (automatic via `depends_on`):
+1. ArangoDB starts → health check passes (~30 s)
+2. Floci starts → health check passes (~15 s)
+3. fixcore starts after ArangoDB is healthy (~60 s startup)
+4. fixworker starts after fixcore is healthy and Floci is healthy
+
+Wait for Floci to be ready before seeding:
 ```bash
 curl http://localhost:4566/_floci/health
+# → {"status":"running"}
 ```
 
 ---
@@ -50,40 +65,42 @@ Floci starts empty. This script creates a realistic AWS environment inside it:
 
 ```bash
 cd cloudmind/agent
-source venv/bin/activate   # or: python -m venv venv && pip install -r requirements.txt
-pip install boto3           # needed for discovery scripts
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
 
 python scripts/seed_floci.py
 ```
 
 Resources created inside Floci:
 - 1 VPC + 4 subnets (2 public, 2 private)
-- 2 security groups (web-tier port 443/80, db-tier port 5432)
+- 2 security groups (web-tier ports 80/443, db-tier port 5432)
 - 4 EC2 instances (web-server-01, api-server-01, worker-node-1/2)
-- 3 S3 buckets (one public, two private+versioned)
+- 3 S3 buckets (one public, two private + versioned)
 - 3 IAM roles (ec2-ssm-role, lambda-basic-role, rds-monitoring-role)
 - 1 RDS PostgreSQL instance (encrypted, not publicly accessible)
 - 3 Lambda functions (python3.12 + nodejs20.x)
 - 1 Application Load Balancer
 
+**Why we seed before fixworker collects:** fixworker starts collecting as soon as it connects to fixcore (`start_collect_on_subscriber_connect=true`). Since fixcore takes ~60-90 s to become healthy and fixworker waits for that, seeding completes well before the first collection run starts.
+
 ---
 
-## Step 3 — Run Discovery (Floci → ArangoDB)
+## Step 3 — FixInventory discovers and persists the graph
 
-This is the FixInventory-equivalent step: reads every AWS service from Floci
-via boto3 and writes the resource graph to ArangoDB in FixInventory's exact schema.
+No manual step needed — this happens automatically.
 
-```bash
-python scripts/discover.py
-```
+Once fixworker connects to fixcore, it:
+1. Calls `sts:GetCallerIdentity` against Floci to discover the account ID
+2. Iterates over AWS services (EC2, VPC, S3, IAM, RDS, Lambda, ELB) against `http://floci:4566`
+3. Sends every resource to fixcore, which writes them to ArangoDB
 
-FixInventory schema written to ArangoDB:
+**FixInventory ArangoDB schema:**
 - **Database**: `fix`
 - **Graph**: `fix`
-- **Vertex collection**: `fix`  (one document per AWS resource)
-- **Edge collection**: `fix_default`  (parent → child relationships)
+- **Vertex collection**: `fix` — one document per AWS resource
+- **Edge collection**: `fix_default` — directed edges (parent → child)
 
-Each node document matches FixInventory's format exactly:
+Each node document:
 ```json
 {
   "_key": "i-0abc123",
@@ -105,9 +122,19 @@ Each node document matches FixInventory's format exactly:
 }
 ```
 
-Verify in ArangoDB UI at http://localhost:8529 (root / cloudmind):
+**Verify the graph** in ArangoDB UI at http://localhost:8529 (root / cloudmind):
 - Database `fix` → Collection `fix` → 20+ resource documents
 - Database `fix` → Collection `fix_default` → edges between resources
+
+**Monitor fixworker logs:**
+```bash
+docker logs fixworker -f
+```
+
+**Re-trigger collection** (e.g. after adding more resources to Floci):
+```bash
+docker compose restart fixworker
+```
 
 ---
 
@@ -124,7 +151,7 @@ ARANGO_HOST=http://localhost:8529
 ARANGO_PASSWORD=cloudmind
 REDIS_URL=redis://localhost:6379
 FRONTEND_URL=http://localhost:3000
-# FixInventory schema defaults — no need to change for local dev:
+# FixInventory schema defaults — no change needed for local dev:
 # ARANGO_DB=fix
 # ARANGO_VERTEX_COLLECTION=fix
 # ARANGO_EDGE_COLLECTION=fix_default
@@ -148,7 +175,7 @@ curl http://localhost:8000/health
 curl http://localhost:8000/agent/chat \
   -X POST -H "Content-Type: application/json" \
   -d '{"message":"How many EC2 instances do I have?","session_id":"test"}'
-# → "You have 4 running EC2 instances..."
+# → "You have 4 EC2 instances in us-east-1..."
 ```
 
 ---
@@ -167,27 +194,54 @@ Open http://localhost:3000
 
 ---
 
-## Re-running Discovery
+## How FixInventory connects to Floci (not real AWS)
 
-After adding more resources to Floci, re-run discovery to update ArangoDB:
+fixworker's container receives `AWS_ENDPOINT_URL=http://floci:4566`. This is a standard
+botocore environment variable (supported since botocore 1.27) that redirects **all** boto3
+service calls to the specified endpoint. Combined with fake credentials (`test`/`test`),
+this means:
+
+- fixworker **never contacts real AWS**
+- Every API call hits Floci's local simulator instead
+- Discovered resources are exactly what `seed_floci.py` created
+
+The PSK (`cloudmind-fixpsk`) is a shared secret between fixcore and fixworker used for
+mutual authentication over the HTTPS channel.
+
+---
+
+## Re-triggering Discovery
+
+After modifying resources in Floci, restart fixworker to re-collect:
+
+```bash
+python scripts/seed_floci.py        # update resources in Floci
+docker compose restart fixworker    # fixworker re-collects on startup
+```
+
+---
+
+## Fallback: manual discovery script
+
+If FixInventory containers are unavailable, `scripts/discover.py` can populate
+ArangoDB directly (writes the same FixInventory-compatible schema):
 
 ```bash
 python scripts/discover.py
 ```
 
-The script upserts — existing resources are updated, new ones are added.
+This is a development fallback only — in normal operation, fixworker handles all discovery.
 
 ---
 
 ## Options
 
 ```bash
-# Different Floci port or region:
-python scripts/seed_floci.py --endpoint http://localhost:4566 --region eu-west-1
-python scripts/discover.py   --endpoint http://localhost:4566 --region eu-west-1
+# Different region:
+python scripts/seed_floci.py --region eu-west-1
 
-# Remote ArangoDB (e.g. ArangoCloud):
-python scripts/discover.py \
-  --arango-host https://your-cluster.arangodb.cloud:8529 \
-  --arango-password yourpassword
+# Remote ArangoDB (e.g. ArangoCloud) for the agent backend:
+# Set in agent/.env:
+# ARANGO_HOST=https://your-cluster.arangodb.cloud:8529
+# ARANGO_PASSWORD=yourpassword
 ```

@@ -1,6 +1,8 @@
 version: "3.9"
 
 services:
+
+  # ── ArangoDB — graph database (FixInventory schema) ─────────────────────
   arangodb:
     image: arangodb:3.11.12
     environment:
@@ -9,14 +11,22 @@ services:
       - "8529:8529"
     volumes:
       - arango_data:/var/lib/arangodb3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8529/_api/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
+  # ── Redis — session context store ────────────────────────────────────────
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
 
-  # Floci: local AWS environment simulator (https://github.com/floci-io/floci)
-  # Exposes 47 AWS services on port 4566 — no real AWS account needed.
+  # ── Floci — local AWS environment simulator ───────────────────────────────
+  # https://github.com/floci-io/floci
+  # Simulates 47 AWS services on port 4566. No real AWS account needed.
   floci:
     image: floci/floci:latest
     ports:
@@ -33,6 +43,65 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  # ── fixcore — FixInventory core (graph API + collection orchestrator) ─────
+  # https://fixinventory.org/
+  # Manages the ArangoDB resource graph and orchestrates fixworker collection.
+  # API available at https://localhost:8900 (self-signed TLS).
+  fixcore:
+    image: somecr.io/someengineering/fixcore:4.2.0
+    container_name: fixcore
+    ports:
+      - "8900:8900"
+    environment:
+      PSK: cloudmind-fixpsk
+      FIXCORE_ANALYTICS_OPT_OUT: "true"
+      # ArangoDB connection — uses root to avoid bootstrap user creation
+      FIXCORE_GRAPHDB_SERVER: http://arangodb:8529
+      FIXCORE_GRAPHDB_DATABASE: fix
+      FIXCORE_GRAPHDB_USERNAME: root
+      FIXCORE_GRAPHDB_PASSWORD: cloudmind
+    command:
+      - --override
+      # Auto-trigger collection as soon as fixworker connects
+      - fixcore.runtime.start_collect_on_subscriber_connect=true
+    depends_on:
+      arangodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsk https://localhost:8900/system/ready || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    restart: on-failure
+    stop_grace_period: 2m
+
+  # ── fixworker — FixInventory worker (AWS discovery pointed at Floci) ──────
+  # Scans Floci (not real AWS) via boto3 using AWS_ENDPOINT_URL override.
+  # Discovered resources are sent to fixcore, which writes them to ArangoDB
+  # using FixInventory's schema: db=fix, vertices=fix, edges=fix_default.
+  fixworker:
+    image: somecr.io/someengineering/fixworker:4.2.0
+    container_name: fixworker
+    environment:
+      PSK: cloudmind-fixpsk
+      FIXWORKER_FIXCORE_URI: https://fixcore:8900
+      # Fake credentials — Floci accepts any key/secret
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      # Redirect ALL boto3 AWS calls to Floci instead of real AWS endpoints.
+      # boto3 / botocore >= 1.27 respects AWS_ENDPOINT_URL as a global override.
+      # This means fixworker never contacts real AWS — only Floci on :4566.
+      AWS_ENDPOINT_URL: http://floci:4566
+    depends_on:
+      fixcore:
+        condition: service_healthy
+      floci:
+        condition: service_healthy
+    restart: on-failure
+    stop_grace_period: 2m
 
 volumes:
   arango_data:
