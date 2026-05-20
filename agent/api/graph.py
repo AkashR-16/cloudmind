@@ -9,19 +9,21 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 #   vertex collection = settings.arango_vertex_collection  (default: "fix")
 #   edge collection   = settings.arango_edge_collection    (default: "fix_default")
 #   each node has: kinds[] array, reported.kind, reported.name, reported.region, etc.
-_NODE_QUERY_TMPL = """
-FOR n IN {vertex}
-  FILTER n.reported.kind LIKE 'aws_%'
+def _node_query(vertex_col: str) -> str:
+    kf = "kind" if vertex_col == "node" else "reported.kind"
+    return f"""
+FOR n IN {{vertex}}
+  FILTER n.{kf} LIKE 'aws_%'
   LIMIT @limit
-  RETURN {{
+  RETURN {{{{
     id: n._key,
-    kind: n.reported.kind,
+    kind: n.{kf},
     name: n.reported.name,
     region: n.reported.region,
     account_id: n.reported.account_id,
     tags: n.reported.tags,
     reported: n.reported
-  }}
+  }}}}
 """
 
 _EDGE_QUERY_TMPL = """
@@ -44,7 +46,7 @@ async def get_resources(limit: int = Query(default=200, le=500)):
     db = get_db()
     raw_nodes = execute_aql(
         db,
-        _NODE_QUERY_TMPL.format(vertex=vertex_col),
+        _node_query(vertex_col).format(vertex=vertex_col),
         {"limit": effective_limit},
     )
     raw_edges = execute_aql(
