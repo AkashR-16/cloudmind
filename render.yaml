@@ -18,11 +18,9 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
-      # ArangoCloud instance was seeded with the old schema (fixinventory/node/default).
-      # These overrides keep production pointing at that data until re-seeded with discover.py.
       - key: ARANGO_DB
-        value: fixinventory
+        value: fix
       - key: ARANGO_VERTEX_COLLECTION
-        value: node
+        value: fix
       - key: ARANGO_EDGE_COLLECTION
-        value: default
+        value: fix_default
