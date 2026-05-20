@@ -35,6 +35,7 @@ async def _stream_response(request: ChatRequest) -> StreamingResponse:
                 yield chunk
         return StreamingResponse(_unknown_gen(), media_type="text/plain")
 
+    aql_error: str | None = None
     try:
         aql_query = await generate_aql(intent)
         db = get_db()
@@ -48,12 +49,15 @@ async def _stream_response(request: ChatRequest) -> StreamingResponse:
                 status_code=429,
                 detail="Gemini API rate limit reached. Please wait a moment and try again.",
             )
+        # AQL syntax/execution error — surface it so synthesizer can say "query failed"
+        # instead of silently returning empty results and fabricating "nothing found"
+        aql_error = err
         db_results = []
 
     full_response: list[str] = []
 
     async def _gen():
-        async for chunk in synthesize_stream(intent, db_results, history):
+        async for chunk in synthesize_stream(intent, db_results, history, aql_error=aql_error):
             full_response.append(chunk)
             yield chunk
 

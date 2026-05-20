@@ -22,8 +22,11 @@ def _build_messages(
     intent: Intent,
     db_results: list,
     history: list[ChatMessage],
+    aql_error: str | None = None,
 ) -> list[dict]:
-    if db_results:
+    if aql_error:
+        data_str = f"QUERY FAILED — unable to retrieve data. Do not say 'no resources found'. Instead say the query could not be completed and ask the user to rephrase."
+    elif db_results:
         data_str = json.dumps(db_results, indent=2)
     else:
         data_str = "No matching resources found."
@@ -55,9 +58,10 @@ async def synthesize_stream(
     intent: Intent,
     db_results: list,
     history: list[ChatMessage],
+    aql_error: str | None = None,
 ) -> AsyncIterator[str]:
     model = get_model()
-    messages = _build_messages(intent, db_results, history)
+    messages = _build_messages(intent, db_results, history, aql_error=aql_error)
 
     response = model.generate_content(messages, stream=True)
     for chunk in response:
