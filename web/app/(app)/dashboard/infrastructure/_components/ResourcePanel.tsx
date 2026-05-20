@@ -128,10 +128,10 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_ec2_instance") {
     return (
       <Section title="Instance">
-        {reported.instance_type && <Field label="Type" value={String(reported.instance_type)} />}
-        {reported.instance_status && <Field label="Status" value={String(reported.instance_status)} />}
-        {reported.private_ip_address && <Field label="Private IP" value={String(reported.private_ip_address)} mono />}
-        {reported.public_ip_address && <Field label="Public IP" value={String(reported.public_ip_address)} mono />}
+        {!!reported.instance_type && <Field label="Type" value={String(reported.instance_type)} />}
+        {!!reported.instance_status && <Field label="Status" value={String(reported.instance_status)} />}
+        {!!reported.private_ip_address && <Field label="Private IP" value={String(reported.private_ip_address)} mono />}
+        {!!reported.public_ip_address && <Field label="Public IP" value={String(reported.public_ip_address)} mono />}
       </Section>
     );
   }
@@ -139,8 +139,8 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_s3_bucket") {
     return (
       <Section title="Bucket">
-        <Field label="Public Access" value={reported.is_public ? "⚠ Open to internet" : "Blocked"} />
-        <Field label="Versioning" value={reported.versioning_enabled ? "Enabled" : "Disabled"} />
+        <Field label="Public Access" value={!!reported.is_public ? "⚠ Open to internet" : "Blocked"} />
+        <Field label="Versioning" value={!!reported.versioning_enabled ? "Enabled" : "Disabled"} />
       </Section>
     );
   }
@@ -167,8 +167,8 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_vpc") {
     return (
       <Section title="Network">
-        {reported.cidr_block && <Field label="CIDR" value={String(reported.cidr_block)} mono />}
-        <Field label="Default VPC" value={reported.is_default ? "Yes" : "No"} />
+        {!!reported.cidr_block && <Field label="CIDR" value={String(reported.cidr_block)} mono />}
+        <Field label="Default VPC" value={!!reported.is_default ? "Yes" : "No"} />
       </Section>
     );
   }
@@ -176,8 +176,8 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_subnet") {
     return (
       <Section title="Network">
-        {reported.cidr_block && <Field label="CIDR" value={String(reported.cidr_block)} mono />}
-        {reported.vpc_id && <Field label="VPC" value={String(reported.vpc_id)} mono />}
+        {!!reported.cidr_block && <Field label="CIDR" value={String(reported.cidr_block)} mono />}
+        {!!reported.vpc_id && <Field label="VPC" value={String(reported.vpc_id)} mono />}
       </Section>
     );
   }
@@ -185,7 +185,7 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_iam_role") {
     return (
       <Section title="Trust">
-        {reported.assume_role_policy && <Field label="Principal" value={String(reported.assume_role_policy)} />}
+        {!!reported.assume_role_policy && <Field label="Principal" value={String(reported.assume_role_policy)} />}
       </Section>
     );
   }
@@ -193,10 +193,10 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_rds_instance") {
     return (
       <Section title="Database">
-        {reported.engine && <Field label="Engine" value={String(reported.engine)} />}
-        {reported.instance_class && <Field label="Class" value={String(reported.instance_class)} />}
-        <Field label="Encrypted" value={reported.storage_encrypted ? "Yes" : "No"} />
-        <Field label="Public" value={reported.publicly_accessible ? "⚠ Yes" : "No"} />
+        {!!reported.engine && <Field label="Engine" value={String(reported.engine)} />}
+        {!!reported.instance_class && <Field label="Class" value={String(reported.instance_class)} />}
+        <Field label="Encrypted" value={!!reported.storage_encrypted ? "Yes" : "No"} />
+        <Field label="Public" value={!!reported.publicly_accessible ? "⚠ Yes" : "No"} />
       </Section>
     );
   }
@@ -204,8 +204,8 @@ function KindProperties({ kind, reported }: { kind: string; reported: Record<str
   if (kind === "aws_lambda_function") {
     return (
       <Section title="Function">
-        {reported.runtime && <Field label="Runtime" value={String(reported.runtime)} />}
-        {reported.memory_size && <Field label="Memory" value={`${reported.memory_size} MB`} />}
+        {!!reported.runtime && <Field label="Runtime" value={String(reported.runtime)} />}
+        {!!reported.memory_size && <Field label="Memory" value={`${reported.memory_size} MB`} />}
       </Section>
     );
   }
