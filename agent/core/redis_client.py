@@ -6,7 +6,13 @@ from core.models import ChatMessage
 
 def get_redis() -> aioredis.Redis:
     settings = get_settings()
-    return aioredis.from_url(settings.redis_url, decode_responses=True)
+    url = settings.redis_url
+    # Upstash requires TLS. Auto-upgrade redis:// → rediss:// for Upstash hosts.
+    if "upstash.io" in url and url.startswith("redis://"):
+        url = "rediss://" + url[len("redis://"):]
+    if url.startswith("rediss://"):
+        return aioredis.from_url(url, decode_responses=True, ssl_cert_reqs=None)
+    return aioredis.from_url(url, decode_responses=True)
 
 
 async def load_context(redis: aioredis.Redis, session_id: str) -> list[ChatMessage]:
