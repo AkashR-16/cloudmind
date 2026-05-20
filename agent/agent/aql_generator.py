@@ -105,6 +105,36 @@ _FORBIDDEN_PATTERNS = [
     r"\bFOR\s+\w+\s+IN\s+\w+\s+REMOVE\b",
 ]
 
+# AQL patterns that are syntactically invalid in ArangoDB for object-arrays.
+# ArangoDB supports `ANY ==` only on scalar arrays, not on arrays of objects.
+_INVALID_ARRAY_PATTERNS = [
+    # ip_permissions ANY == "value"  (object array, not scalar)
+    r"ip_permissions\s+ANY\s*==",
+    # IpRanges ANY == "value" — same issue
+    r"IpRanges\s+ANY\s*==",
+]
+
+
+def sanitize_aql(query: str, vertex_col: str, edge_col: str, limit: int) -> str:
+    """Replace known-invalid AQL patterns with correct equivalents."""
+    kf = _kind_field(vertex_col)
+
+    for pattern in _INVALID_ARRAY_PATTERNS:
+        if re.search(pattern, query, re.IGNORECASE):
+            # Extract CIDR value if present, else default to 0.0.0.0/0
+            cidr_match = re.search(r'"([0-9./]+)"', query)
+            cidr = cidr_match.group(1) if cidr_match else "0.0.0.0/0"
+            return (
+                f'FOR n IN {vertex_col} FILTER n.{kf} == "aws_security_group" '
+                f'AND LENGTH(FOR perm IN n.reported.ip_permissions '
+                f'FOR cidr IN perm.IpRanges '
+                f'FILTER cidr.CidrIp == "{cidr}" RETURN 1) > 0 '
+                f'LIMIT {limit} '
+                f'RETURN {{name: n.reported.name, id: n.reported.id, '
+                f'region: n.reported.region, ip_permissions: n.reported.ip_permissions}}'
+            )
+    return query
+
 
 def validate_aql(query: str) -> tuple[bool, str]:
     """Reject any AQL that attempts writes. Returns (is_valid, reason)."""
@@ -185,6 +215,9 @@ async def generate_aql(intent: Intent) -> str:
 
     # Fix LIMIT position before validation (Gemini sometimes puts LIMIT after RETURN)
     query = fix_limit_position(query, settings.aql_result_limit)
+
+    # Replace known-invalid AQL patterns (e.g. ANY== on object arrays) with correct equivalents
+    query = sanitize_aql(query, vertex_col, edge_col, settings.aql_result_limit)
 
     valid, reason = validate_aql(query)
     if not valid:

@@ -43,3 +43,26 @@ def test_aql_prompt_includes_security_group_nested_array_example():
     prompt = _build_aql_prompt("fix", "fix_default", "schema", 100, "SG?", "security_query", {})
     assert "ip_permissions" in prompt
     assert "0.0.0.0/0" in prompt
+
+
+def test_sanitize_aql_replaces_invalid_any_eq_pattern():
+    from agent.aql_generator import sanitize_aql
+    bad = 'FOR n IN fix FILTER n.reported.kind == "aws_security_group" AND n.reported.ip_permissions ANY == "0.0.0.0/0" LIMIT 100 RETURN n'
+    result = sanitize_aql(bad, "fix", "fix_default", 100)
+    assert "ANY ==" not in result
+    assert "FOR perm IN n.reported.ip_permissions" in result
+    assert "FOR cidr IN perm.IpRanges" in result
+
+
+def test_sanitize_aql_leaves_valid_queries_unchanged():
+    from agent.aql_generator import sanitize_aql
+    good = 'FOR n IN fix FILTER n.reported.kind == "aws_ec2_instance" LIMIT 100 RETURN n'
+    result = sanitize_aql(good, "fix", "fix_default", 100)
+    assert result == good
+
+
+def test_sanitize_aql_preserves_cidr_value():
+    from agent.aql_generator import sanitize_aql
+    bad = 'FOR n IN fix FILTER n.reported.ip_permissions ANY == "10.0.0.0/8" LIMIT 100 RETURN n'
+    result = sanitize_aql(bad, "fix", "fix_default", 100)
+    assert "10.0.0.0/8" in result
