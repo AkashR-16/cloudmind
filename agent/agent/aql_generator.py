@@ -103,6 +103,9 @@ def fix_limit_position(query: str, limit: int) -> str:
     return query
 
 
+inject_limit_if_missing = fix_limit_position
+
+
 async def generate_aql(intent: Intent) -> str:
     settings = get_settings()
     model = get_aql_model()
