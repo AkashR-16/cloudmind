@@ -4,8 +4,9 @@ import { useState, useCallback, useRef } from "react";
 import { Message, ChatState } from "./types";
 import { generateSessionId } from "@/lib/utils";
 
-const AGENT_TIMEOUT_MS = 20_000;
-const FIRST_TOKEN_TIMEOUT_MS = 10_000;
+const AGENT_TIMEOUT_MS = 90_000;
+const WAKE_UP_HINT_MS = 8_000;
+const FIRST_TOKEN_TIMEOUT_MS = 20_000;
 
 export function useChat(): ChatState & {
   sendMessage: (content: string) => Promise<void>;
@@ -55,8 +56,11 @@ export function useChat(): ChatState & {
 
       const controller = new AbortController();
       const hardTimeout = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
+      const wakeUpTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
+        appendToken(assistantId, "*The backend is starting up (Render free tier — takes ~30s on first request). Hang tight...*");
+      }, WAKE_UP_HINT_MS);
       let firstTokenTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-        appendToken(assistantId, "*Still working on it...*");
+        appendToken(assistantId, "\n\n*Almost there...*");
       }, FIRST_TOKEN_TIMEOUT_MS);
 
       try {
@@ -91,15 +95,18 @@ export function useChat(): ChatState & {
           if (firstTokenTimer) {
             clearTimeout(firstTokenTimer);
             firstTokenTimer = null;
-            // Clear the "still working" placeholder if it was added
+            // Clear placeholder messages once real tokens arrive
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId
-                  ? { ...m, content: m.content.replace("*Still working on it...*", "") }
+                  ? { ...m, content: m.content
+                      .replace(/\*The backend is starting up[^*]*\*\n*/g, "")
+                      .replace("*Almost there...*", "") }
                   : m
               )
             );
           }
+          clearTimeout(wakeUpTimer);
 
           appendToken(assistantId, chunk);
         }
@@ -118,6 +125,7 @@ export function useChat(): ChatState & {
         setError(message);
       } finally {
         clearTimeout(hardTimeout);
+        clearTimeout(wakeUpTimer);
         if (firstTokenTimer) clearTimeout(firstTokenTimer);
         finalizeMessage(assistantId);
         setIsLoading(false);
