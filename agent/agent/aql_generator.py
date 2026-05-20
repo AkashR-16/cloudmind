@@ -1,7 +1,7 @@
 import re
-from ..core.gemini_client import get_aql_model
-from ..core.models import Intent, IntentType
-from ..core.config import get_settings
+from core.gemini_client import get_aql_model
+from core.models import Intent, IntentType
+from core.config import get_settings
 
 # FixInventory ArangoDB schema reference:
 # - Vertex collection: "node"  (all resource kinds stored here)

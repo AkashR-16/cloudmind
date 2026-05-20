@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from google.generativeai import GenerativeModel
 from functools import lru_cache
-from .config import get_settings
+from core.config import get_settings
 
 
 @lru_cache

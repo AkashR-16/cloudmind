@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from ..core.models import SessionResponse
-from ..core.redis_client import get_redis, load_context, clear_context
+from core.models import SessionResponse
+from core.redis_client import get_redis, load_context, clear_context
 
 router = APIRouter(prefix="/session", tags=["session"])
 

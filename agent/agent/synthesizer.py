@@ -1,7 +1,7 @@
 import json
 from typing import AsyncIterator
-from ..core.gemini_client import get_model
-from ..core.models import ChatMessage, Intent
+from core.gemini_client import get_model
+from core.models import ChatMessage, Intent
 
 _SYSTEM_PROMPT = """You are CloudMind, an expert AI assistant specializing in AWS cloud infrastructure.
 

@@ -1,6 +1,6 @@
 import json
-from ..core.gemini_client import get_aql_model
-from ..core.models import Intent, IntentType
+from core.gemini_client import get_aql_model
+from core.models import Intent, IntentType
 
 _INTENT_PROMPT = """You are an AWS infrastructure assistant intent classifier.
 

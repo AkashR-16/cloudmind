@@ -1,7 +1,7 @@
 import json
 import redis.asyncio as aioredis
-from .config import get_settings
-from .models import ChatMessage
+from core.config import get_settings
+from core.models import ChatMessage
 
 
 def get_redis() -> aioredis.Redis:

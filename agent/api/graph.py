@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
-from ..core.arango_client import get_db, execute_aql, VERTEX_COLLECTION, EDGE_COLLECTION
-from ..core.models import GraphResponse, ResourceNode
-from ..core.config import get_settings
+from core.arango_client import get_db, execute_aql, VERTEX_COLLECTION, EDGE_COLLECTION
+from core.models import GraphResponse, ResourceNode
+from core.config import get_settings
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 

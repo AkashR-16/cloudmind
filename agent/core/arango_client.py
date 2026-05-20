@@ -1,7 +1,7 @@
 from arango import ArangoClient as _ArangoClient
 from arango.database import StandardDatabase
 from functools import lru_cache
-from .config import get_settings
+from core.config import get_settings
 
 
 def get_db() -> StandardDatabase:
