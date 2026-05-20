@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "cm_session",
+      "value": "authenticated",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1779905968.479262,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
