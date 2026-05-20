@@ -129,10 +129,10 @@ function LoginScene({ t }: { t: number }) {
 }
 
 // ── CHAT SCENE (t: 9 → 52) ─────────────────────────────
-const Q1   = "Which EC2 instances are currently running?";
-const A1   = "Found **3 running** EC2 instances in us-east-1:\n• **web-server-01** (t3.medium) · i-001\n• **api-server-01** (t3.large) · i-002\n• **worker-node-1** (t3.small) · i-003";
-const Q2   = "Are any S3 buckets publicly accessible?";
-const A2   = "⚠️ **Security alert** — **my-app-assets** has public access enabled.\n\nBlock Public Access is **off**. The bucket is accessible to the public internet. Recommend reviewing the bucket policy immediately.";
+const Q1   = "How many EC2 instances do I have?";
+const A1   = "You have **4 EC2 instances** in us-east-1 (all currently terminated):\n• **web-server-01** (t3.medium)\n• **api-server-01** (t3.large)\n• **worker-node-1** (t3.small)\n• **worker-node-2** (t3.small)";
+const Q2   = "Which security groups allow inbound 0.0.0.0/0?";
+const A2   = "⚠️ **Security alert** — **web-tier-sg** allows unrestricted inbound traffic:\n\n• Port **80** (HTTP) from 0.0.0.0/0\n• Port **443** (HTTPS) from 0.0.0.0/0\n\nVerify this is intentional for public-facing services.";
 
 function TypingDots() {
   return (
@@ -290,19 +290,19 @@ function Thumbnail({ onClick }: { onClick: () => void }) {
         <div className="flex-1 px-4 py-3 space-y-2.5">
           <div className="flex gap-1.5 flex-row-reverse">
             <div className="w-5 h-5 rounded-lg bg-brand-500/30 flex items-center justify-center shrink-0"><User className="w-2.5 h-2.5 text-white" /></div>
-            <div className="bg-brand-500 px-2.5 py-1.5 rounded-xl rounded-tr-sm text-[10px] text-white max-w-[70%]">Which EC2 instances are currently running?</div>
+            <div className="bg-brand-500 px-2.5 py-1.5 rounded-xl rounded-tr-sm text-[10px] text-white max-w-[70%]">How many EC2 instances do I have?</div>
           </div>
           <div className="flex gap-1.5">
             <div className="w-5 h-5 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center shrink-0"><Cloud className="w-2.5 h-2.5 text-brand-400" /></div>
-            <div className="bg-white/[0.04] border border-white/[0.08] px-2.5 py-1.5 rounded-xl rounded-tl-sm text-[10px] text-gray-300 max-w-[70%]">Found <strong className="text-white">3 running</strong> EC2 instances — web-server-01, api-server-01, worker-node-1.</div>
+            <div className="bg-white/[0.04] border border-white/[0.08] px-2.5 py-1.5 rounded-xl rounded-tl-sm text-[10px] text-gray-300 max-w-[70%]">You have <strong className="text-white">4 EC2 instances</strong> in us-east-1 (all terminated).</div>
           </div>
           <div className="flex gap-1.5 flex-row-reverse">
             <div className="w-5 h-5 rounded-lg bg-brand-500/30 flex items-center justify-center shrink-0"><User className="w-2.5 h-2.5 text-white" /></div>
-            <div className="bg-brand-500 px-2.5 py-1.5 rounded-xl rounded-tr-sm text-[10px] text-white max-w-[70%]">Are any S3 buckets publicly accessible?</div>
+            <div className="bg-brand-500 px-2.5 py-1.5 rounded-xl rounded-tr-sm text-[10px] text-white max-w-[70%]">Which security groups allow inbound 0.0.0.0/0?</div>
           </div>
           <div className="flex gap-1.5">
             <div className="w-5 h-5 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center shrink-0"><Cloud className="w-2.5 h-2.5 text-brand-400" /></div>
-            <div className="bg-white/[0.04] border border-white/[0.08] px-2.5 py-1.5 rounded-xl rounded-tl-sm text-[10px] text-gray-300 max-w-[70%]">⚠️ <strong className="text-white">Security alert</strong> — my-app-assets has public access enabled.</div>
+            <div className="bg-white/[0.04] border border-white/[0.08] px-2.5 py-1.5 rounded-xl rounded-tl-sm text-[10px] text-gray-300 max-w-[70%]">⚠️ <strong className="text-white">web-tier-sg</strong> — ports 80 & 443 open to 0.0.0.0/0.</div>
           </div>
         </div>
       </div>
@@ -314,7 +314,7 @@ function Thumbnail({ onClick }: { onClick: () => void }) {
         </div>
         <div className="text-center">
           <p className="text-white text-sm font-semibold">Watch demo</p>
-          <p className="text-gray-400 text-xs mt-0.5">0:{TOTAL} · Sign in → Ask questions → Get answers</p>
+          <p className="text-gray-400 text-xs mt-0.5">0:{TOTAL} · Sign in → EC2 count → Security audit</p>
         </div>
       </div>
     </div>

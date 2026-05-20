@@ -15,17 +15,19 @@ import {
 } from "lucide-react";
 
 // ── Kind config ─────────────────────────────────────────────
+// Levels represent AWS network hierarchy:
+// 0: VPC → 1: Subnet/ELB → 2: Compute (EC2/RDS/Lambda) → 3: Security Groups → 4: Global (IAM/S3)
 const KIND_CONFIG: Record<string, { color: string; icon: React.ElementType; level: number }> = {
   aws_vpc:              { color: "#3b82f6", icon: Network,   level: 0 },
   aws_elb:              { color: "#ec4899", icon: Globe,     level: 1 },
-  aws_subnet:           { color: "#8b5cf6", icon: GitBranch, level: 2 },
-  aws_ec2_instance:     { color: "#22c55e", icon: Server,    level: 3 },
+  aws_subnet:           { color: "#8b5cf6", icon: GitBranch, level: 1 },
+  aws_ec2_instance:     { color: "#22c55e", icon: Server,    level: 2 },
+  aws_rds_instance:     { color: "#06b6d4", icon: Database,  level: 2 },
+  aws_lambda_function:  { color: "#a855f7", icon: Zap,       level: 2 },
   aws_security_group:   { color: "#ef4444", icon: Shield,    level: 3 },
-  aws_rds_instance:     { color: "#06b6d4", icon: Database,  level: 4 },
-  aws_lambda_function:  { color: "#a855f7", icon: Zap,       level: 4 },
-  aws_iam_role:         { color: "#f97316", icon: Key,       level: 5 },
-  aws_s3_bucket:        { color: "#f59e0b", icon: HardDrive, level: 5 },
-  aws_route53_zone:     { color: "#10b981", icon: Globe,     level: 5 },
+  aws_iam_role:         { color: "#f97316", icon: Key,       level: 4 },
+  aws_s3_bucket:        { color: "#f59e0b", icon: HardDrive, level: 4 },
+  aws_route53_zone:     { color: "#10b981", icon: Globe,     level: 4 },
 };
 
 function getKindConfig(kind: string) {
@@ -120,17 +122,67 @@ function buildFlowEdges(edges: Array<{ from: string; to: string; label?: string 
   }));
 }
 
-// ── Legend ───────────────────────────────────────────────────
-function Legend() {
+// ── Stats bar ────────────────────────────────────────────────
+function StatsBar({ nodes }: { nodes: ResourceNode[] }) {
+  const counts = nodes.reduce<Record<string, number>>((acc, n) => {
+    acc[n.kind] = (acc[n.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const order = [
+    "aws_vpc", "aws_subnet", "aws_ec2_instance", "aws_security_group",
+    "aws_s3_bucket", "aws_iam_role", "aws_rds_instance", "aws_lambda_function",
+  ];
+
+  const entries = order
+    .filter((k) => counts[k])
+    .map((k) => ({ kind: k, count: counts[k], ...getKindConfig(k) }));
+
   return (
-    <div className="absolute top-4 left-4 z-10 bg-surface-card/90 backdrop-blur-md border border-white/[0.08] rounded-xl px-3 py-3 space-y-1.5 max-h-[calc(100vh-12rem)] overflow-y-auto">
-      <p className="text-[9px] text-gray-500 uppercase tracking-wider font-medium mb-2">Resource types</p>
-      {Object.entries(KIND_CONFIG).map(([kind, { color, icon: Icon }]) => (
-        <div key={kind} className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-surface-card/90 backdrop-blur-md border border-white/[0.08] rounded-2xl px-4 py-2.5 shadow-xl">
+      {entries.map(({ kind, count, color, icon: Icon }) => (
+        <div key={kind} className="flex items-center gap-1.5 px-2 border-r border-white/[0.06] last:border-0">
+          <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: `${color}18`, border: `1px solid ${color}35` }}>
             <Icon className="w-2.5 h-2.5" style={{ color }} />
           </div>
-          <span className="text-[10px] text-gray-400">{formatResourceKind(kind)}</span>
+          <span className="text-[10px] font-semibold text-white">{count}</span>
+          <span className="text-[9px] text-gray-500 hidden sm:block">{formatResourceKind(kind)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Legend ───────────────────────────────────────────────────
+function Legend() {
+  const levelLabels: Record<number, string> = {
+    0: "Network", 1: "Subnets", 2: "Compute", 3: "Security", 4: "Global",
+  };
+  const byLevel = Object.entries(KIND_CONFIG).reduce<Record<number, Array<[string, typeof KIND_CONFIG[string]]>>>(
+    (acc, entry) => {
+      const lvl = entry[1].level;
+      if (!acc[lvl]) acc[lvl] = [];
+      acc[lvl].push(entry);
+      return acc;
+    }, {}
+  );
+
+  return (
+    <div className="absolute top-4 left-4 z-10 bg-surface-card/90 backdrop-blur-md border border-white/[0.08] rounded-xl px-3 py-3 space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto">
+      <p className="text-[9px] text-gray-500 uppercase tracking-wider font-medium">Resource hierarchy</p>
+      {Object.entries(byLevel).sort(([a], [b]) => Number(a) - Number(b)).map(([lvl, kinds]) => (
+        <div key={lvl}>
+          <p className="text-[8px] text-gray-600 uppercase tracking-wider mb-1.5">{levelLabels[Number(lvl)]}</p>
+          <div className="space-y-1">
+            {kinds.map(([kind, { color, icon: Icon }]) => (
+              <div key={kind} className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
+                  <Icon className="w-2.5 h-2.5" style={{ color }} />
+                </div>
+                <span className="text-[10px] text-gray-400">{formatResourceKind(kind)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -190,6 +242,7 @@ export function InfrastructureGraph() {
     <div className="relative flex h-[calc(100vh-7rem)]">
       <div className="flex-1 relative">
         <Legend />
+        <StatsBar nodes={data.nodes} />
 
         {/* Resource count + tip */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
