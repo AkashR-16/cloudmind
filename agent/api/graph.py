@@ -1,44 +1,57 @@
 from fastapi import APIRouter, Query
-from core.arango_client import get_db, execute_aql, VERTEX_COLLECTION, EDGE_COLLECTION
+from core.arango_client import get_db, execute_aql, get_collections
 from core.models import GraphResponse, ResourceNode
 from core.config import get_settings
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
-_NODE_QUERY = """
-FOR n IN {collection}
-  FILTER n.kind LIKE 'aws_%'
+# Queries use FixInventory's real schema:
+#   vertex collection = settings.arango_vertex_collection  (default: "fix")
+#   edge collection   = settings.arango_edge_collection    (default: "fix_default")
+#   each node has: kinds[] array, reported.kind, reported.name, reported.region, etc.
+_NODE_QUERY_TMPL = """
+FOR n IN {vertex}
+  FILTER n.reported.kind LIKE 'aws_%'
   LIMIT @limit
   RETURN {{
     id: n._key,
-    kind: n.kind,
+    kind: n.reported.kind,
     name: n.reported.name,
     region: n.reported.region,
     account_id: n.reported.account_id,
     tags: n.reported.tags,
     reported: n.reported
   }}
-""".format(collection=VERTEX_COLLECTION)
+"""
 
-_EDGE_QUERY = """
-FOR e IN {collection}
+_EDGE_QUERY_TMPL = """
+FOR e IN {edge}
   LIMIT @limit
   RETURN {{
     from: e._from,
     to: e._to,
     label: e.label
   }}
-""".format(collection=EDGE_COLLECTION)
+"""
 
 
 @router.get("/resources", response_model=GraphResponse)
 async def get_resources(limit: int = Query(default=200, le=500)):
     settings = get_settings()
+    vertex_col, edge_col = get_collections()
     effective_limit = min(limit, settings.aql_result_limit * 2)
-    db = get_db()
 
-    raw_nodes = execute_aql(db, _NODE_QUERY, {"limit": effective_limit})
-    raw_edges = execute_aql(db, _EDGE_QUERY, {"limit": effective_limit * 2})
+    db = get_db()
+    raw_nodes = execute_aql(
+        db,
+        _NODE_QUERY_TMPL.format(vertex=vertex_col),
+        {"limit": effective_limit},
+    )
+    raw_edges = execute_aql(
+        db,
+        _EDGE_QUERY_TMPL.format(edge=edge_col),
+        {"limit": effective_limit * 2},
+    )
 
     nodes = [
         ResourceNode(

@@ -1,6 +1,5 @@
 from arango import ArangoClient as _ArangoClient
 from arango.database import StandardDatabase
-from functools import lru_cache
 from core.config import get_settings
 
 
@@ -14,12 +13,10 @@ def get_db() -> StandardDatabase:
     )
 
 
-# FixInventory stores all resources in a unified vertex collection named after
-# the graph (default: "fix"). Resources have a `kind` field for the resource
-# type and a `reported` dict for actual AWS properties.
-# Edges live in the `fix_default` edge collection.
-VERTEX_COLLECTION = "node"
-EDGE_COLLECTION = "default"
+def get_collections() -> tuple[str, str]:
+    """Return (vertex_collection, edge_collection) from settings."""
+    s = get_settings()
+    return s.arango_vertex_collection, s.arango_edge_collection
 
 
 def execute_aql(db: StandardDatabase, query: str, bind_vars: dict | None = None) -> list:

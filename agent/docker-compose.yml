@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   arangodb:
-    image: arangodb:3.11
+    image: arangodb:3.11.12
     environment:
       ARANGO_ROOT_PASSWORD: cloudmind
     ports:
@@ -15,5 +15,25 @@ services:
     ports:
       - "6379:6379"
 
+  # Floci: local AWS environment simulator (https://github.com/floci-io/floci)
+  # Exposes 47 AWS services on port 4566 — no real AWS account needed.
+  floci:
+    image: floci/floci:latest
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_HOSTNAME: localhost
+      FLOCI_BASE_URL: http://localhost:4566
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - floci_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_floci/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
 volumes:
   arango_data:
+  floci_data:

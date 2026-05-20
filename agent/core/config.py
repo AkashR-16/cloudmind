@@ -8,9 +8,14 @@ _ENV_FILE = Path(__file__).parent.parent / ".env"
 class Settings(BaseSettings):
     gemini_api_key: str
     arango_host: str = "http://localhost:8529"
-    arango_db: str = "fixinventory"
+    # FixInventory defaults: database="fix", vertex collection="fix", edge collection="fix_default"
+    # Override via env vars (ARANGO_DB, ARANGO_VERTEX_COLLECTION, ARANGO_EDGE_COLLECTION)
+    # to point at a differently-named database/collection (e.g. an existing ArangoCloud instance).
+    arango_db: str = "fix"
     arango_username: str = "root"
     arango_password: str = ""
+    arango_vertex_collection: str = "fix"
+    arango_edge_collection: str = "fix_default"
     redis_url: str = "redis://localhost:6379"
     # Comma-separated list of allowed CORS origins
     frontend_url: str = "http://localhost:3000"

@@ -8,52 +8,75 @@ from core.config import get_settings
 # - Edge collection:   "default" (relationships between resources)
 # - Key fields: kind (resource type), reported.name, reported.region,
 #               reported.id, reported.tags, reported.account_id
-_SCHEMA_CONTEXT = """
-FixInventory ArangoDB schema:
-- Vertex collection: "node"
-- Edge collection: "default"
-- Each node has:
-    kind: string (e.g. "aws_ec2_instance", "aws_s3_bucket", "aws_vpc",
-          "aws_subnet", "aws_security_group", "aws_iam_role",
-          "aws_rds_instance", "aws_lambda_function", "aws_elb")
-    reported.name: string
-    reported.id: string (AWS resource ID)
-    reported.region: string
-    reported.account_id: string
-    reported.tags: object
-    reported.instance_type: string (EC2 only)
-    reported.instance_status: string (EC2 only, "running"|"stopped")
-    reported.bucket_public_access_block: object (S3 only)
-    reported.is_public: bool (S3/security group)
-    reported.group_name: string (security groups)
+def _build_schema_context(vertex_col: str, edge_col: str) -> str:
+    return f"""
+FixInventory ArangoDB schema (populated from Floci local AWS simulator):
+- Vertex collection: "{vertex_col}"
+- Edge collection: "{edge_col}"
+- Each node document has:
+    _key: string (ArangoDB document key, equals the AWS resource ID)
+    kinds: array of strings — all type ancestors, e.g. ["aws_ec2_instance", "aws_resource", "resource"]
+    reported.kind: string — exact resource type (e.g. "aws_ec2_instance", "aws_s3_bucket", "aws_vpc",
+                   "aws_subnet", "aws_security_group", "aws_iam_role",
+                   "aws_rds_instance", "aws_lambda_function", "aws_elb")
+    reported.id: string — AWS resource ID (e.g. "i-0abc123", "vpc-0abc123")
+    reported.name: string — human-readable name
+    reported.region: string — AWS region (e.g. "us-east-1") or "global" for IAM
+    reported.account_id: string — AWS account ID
+    reported.tags: object — key/value AWS tags
+    reported.instance_type: string — EC2 only (e.g. "t3.medium")
+    reported.instance_status: string — EC2 only ("running" | "stopped" | "terminated")
+    reported.public_ip_address: string — EC2 public IP (if assigned)
+    reported.private_ip_address: string — EC2 private IP
+    reported.is_public: bool — S3 bucket: true if public access block is disabled
+    reported.versioning_enabled: bool — S3 bucket versioning
+    reported.storage_encrypted: bool — RDS instance encryption
+    reported.publicly_accessible: bool — RDS instance public access
+    reported.engine: string — RDS engine (e.g. "postgres", "mysql")
+    reported.instance_class: string — RDS instance class (e.g. "db.t3.micro")
+    reported.runtime: string — Lambda runtime (e.g. "python3.12")
+    reported.memory_size: int — Lambda memory in MB
+    reported.group_name: string — security group name
+    reported.ip_permissions: array — security group inbound rules
+    reported.cidr_block: string — VPC or subnet CIDR block
+    reported.assume_role_policy: string — IAM role trust principal (e.g. "ec2.amazonaws.com")
+    ancestors.cloud.reported.name: string — always "aws"
+    ancestors.account.reported.id: string — AWS account ID
+    ancestors.region.reported.name: string — AWS region name
 """
 
-_AQL_PROMPT = """You are an ArangoDB AQL query generator for AWS infrastructure data.
-
-{schema}
-
-Generate a single AQL query for this question. Rules:
-1. For list/filter queries: FOR n IN node FILTER ... LIMIT {limit} RETURN {{...}}
-   - ALWAYS place LIMIT {limit} BEFORE the RETURN clause — never after it
-2. For COUNT queries: RETURN LENGTH(FOR n IN node FILTER ... RETURN 1)
-   - Use LENGTH(subquery) for counting — NOT COUNT(n) which is invalid in a FOR loop RETURN
-   - Do NOT add LIMIT to count queries — LENGTH() handles the full count
-3. Query only the "node" collection for resource lookups
-4. Use "default" collection only for relationship/topology queries
-5. Return only the fields needed to answer the question
-6. Output ONLY the AQL query — no explanation, no markdown fences
-
-Examples:
-- "How many EC2 instances are running?" →
-  RETURN LENGTH(FOR n IN node FILTER n.kind == "aws_ec2_instance" AND n.reported.instance_status == "running" RETURN 1)
-
-- "List running EC2 instances" →
-  FOR n IN node FILTER n.kind == "aws_ec2_instance" AND n.reported.instance_status == "running" LIMIT {limit} RETURN {{id: n.reported.id, name: n.reported.name, region: n.reported.region}}
-
-Question: {question}
-Intent: {intent}
-Entities: {entities}
-"""
+def _build_aql_prompt(vertex_col: str, edge_col: str, schema: str, limit: int,
+                      question: str, intent: str, entities: object) -> str:
+    """Build the final AQL generation prompt without multi-stage format() calls."""
+    return (
+        f"You are an ArangoDB AQL query generator for AWS infrastructure discovered by FixInventory.\n\n"
+        f"{schema}\n"
+        f"Generate a single AQL query for the question below. Rules:\n"
+        f"1. For list/filter queries:\n"
+        f"   FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_xyz\" LIMIT {limit} RETURN {{...}}\n"
+        f"   - Filter by n.reported.kind (exact string) or use \"aws_xyz\" IN n.kinds\n"
+        f"   - ALWAYS place LIMIT {limit} BEFORE the RETURN clause\n"
+        f"2. For COUNT queries:\n"
+        f"   RETURN LENGTH(FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_xyz\" RETURN 1)\n"
+        f"   - Use LENGTH(subquery) — never COUNT(n) in a FOR loop\n"
+        f"   - Do NOT add outer LIMIT to count queries\n"
+        f"3. For topology queries (what is connected to X):\n"
+        f"   FOR v, e IN 1..1 OUTBOUND (FOR x IN {vertex_col} FILTER x.reported.kind == \"aws_vpc\" LIMIT 1 RETURN x)[0] {edge_col}\n"
+        f"     RETURN {{kind: v.reported.kind, name: v.reported.name}}\n"
+        f"4. Return only fields needed. Output ONLY the AQL — no markdown, no explanation.\n\n"
+        f"Examples:\n"
+        f"- \"How many EC2 instances?\" ->\n"
+        f"  RETURN LENGTH(FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_ec2_instance\" RETURN 1)\n"
+        f"- \"List running EC2 instances\" ->\n"
+        f"  FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_ec2_instance\" AND n.reported.instance_status == \"running\" LIMIT {limit} RETURN {{id: n.reported.id, name: n.reported.name, type: n.reported.instance_type, region: n.reported.region}}\n"
+        f"- \"Which S3 buckets are public?\" ->\n"
+        f"  FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_s3_bucket\" AND n.reported.is_public == true LIMIT {limit} RETURN {{name: n.reported.name, region: n.reported.region}}\n"
+        f"- \"List IAM roles\" ->\n"
+        f"  FOR n IN {vertex_col} FILTER n.reported.kind == \"aws_iam_role\" LIMIT {limit} RETURN {{name: n.reported.name, principal: n.reported.assume_role_policy}}\n\n"
+        f"Question: {question}\n"
+        f"Intent: {intent}\n"
+        f"Entities: {entities}\n"
+    )
 
 
 _FORBIDDEN_PATTERNS = [
@@ -113,8 +136,14 @@ async def generate_aql(intent: Intent) -> str:
     if intent.type == IntentType.unknown:
         return ""
 
-    prompt = _AQL_PROMPT.format(
-        schema=_SCHEMA_CONTEXT,
+    vertex_col = settings.arango_vertex_collection
+    edge_col = settings.arango_edge_collection
+
+    schema_ctx = _build_schema_context(vertex_col, edge_col)
+    prompt = _build_aql_prompt(
+        vertex_col=vertex_col,
+        edge_col=edge_col,
+        schema=schema_ctx,
         limit=settings.aql_result_limit,
         question=intent.raw_question,
         intent=intent.type.value,
