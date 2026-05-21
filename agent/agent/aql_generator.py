@@ -1,5 +1,5 @@
 import re
-from core.gemini_client import get_aql_model
+from core.llm_router import call_llm
 from core.models import Intent, IntentType
 from core.config import get_settings
 
@@ -176,9 +176,8 @@ def fix_limit_position(query: str, limit: int) -> str:
 inject_limit_if_missing = fix_limit_position
 
 
-async def generate_aql(intent: Intent) -> str:
+async def generate_aql(intent: Intent, api_key: str | None = None, provider: str | None = None) -> str:
     settings = get_settings()
-    model = get_aql_model()
 
     if intent.type == IntentType.unknown:
         return ""
@@ -198,12 +197,9 @@ async def generate_aql(intent: Intent) -> str:
     )
 
     try:
-        response = model.generate_content(prompt)
+        query = await call_llm(prompt, api_key=api_key, provider=provider)
     except Exception as e:
-        if "RESOURCE_EXHAUSTED" in str(e) or "quota" in str(e).lower():
-            raise RuntimeError("RESOURCE_EXHAUSTED: Gemini quota exceeded")
-        raise
-    query = response.text.strip()
+        raise RuntimeError(f"LLM error: {e}") from e
 
     # Strip markdown fences
     if query.startswith("```"):
@@ -213,7 +209,7 @@ async def generate_aql(intent: Intent) -> str:
             query = query[3:]
     query = query.strip()
 
-    # Fix LIMIT position before validation (Gemini sometimes puts LIMIT after RETURN)
+    # Fix LIMIT position before validation
     query = fix_limit_position(query, settings.aql_result_limit)
 
     # Replace known-invalid AQL patterns (e.g. ANY== on object arrays) with correct equivalents

@@ -101,6 +101,6 @@ describe("useChat", () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    resolveFirst!();
+    await act(async () => { resolveFirst!(); });
   });
 });

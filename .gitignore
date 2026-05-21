@@ -1,5 +1,6 @@
 # Python
 agent/venv/
+agent/.venv/
 agent/__pycache__/
 agent/**/__pycache__/
 agent/.env
@@ -13,3 +14,4 @@ web/.env.local
 # General
 .DS_Store
 *.log
+web/tsconfig.tsbuildinfo

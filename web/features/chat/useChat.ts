@@ -8,7 +8,7 @@ const AGENT_TIMEOUT_MS = 90_000;
 const WAKE_UP_HINT_MS = 8_000;
 const FIRST_TOKEN_TIMEOUT_MS = 20_000;
 
-export function useChat(): ChatState & {
+export function useChat(apiKey?: string, provider?: string): ChatState & {
   sendMessage: (content: string) => Promise<void>;
   clearSession: () => void;
 } {
@@ -70,6 +70,8 @@ export function useChat(): ChatState & {
           body: JSON.stringify({
             message: content,
             session_id: sessionIdRef.current,
+            ...(apiKey ? { api_key: apiKey } : {}),
+            ...(apiKey && provider ? { provider } : {}),
           }),
           signal: controller.signal,
         });

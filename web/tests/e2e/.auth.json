@@ -5,7 +5,7 @@
       "value": "authenticated",
       "domain": "localhost",
       "path": "/",
-      "expires": 1779905968.479262,
+      "expires": 1779907989.468346,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

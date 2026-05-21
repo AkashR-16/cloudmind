@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock
 from agent.aql_generator import validate_aql, generate_aql, inject_limit_if_missing
 from core.models import Intent, IntentType
 
@@ -43,20 +43,10 @@ def test_inject_limit_if_missing_does_not_duplicate():
     assert result.count("LIMIT") == 1
 
 
-def make_gemini_response(text: str):
-    mock = MagicMock()
-    mock.text = text
-    return mock
-
-
 @pytest.mark.asyncio
-@patch("agent.aql_generator.get_aql_model")
-async def test_generate_aql_for_valid_intent(mock_model_factory):
-    mock_model = MagicMock()
-    mock_model_factory.return_value = mock_model
-    mock_model.generate_content.return_value = make_gemini_response(
-        "FOR n IN node FILTER n.kind == 'aws_ec2_instance' LIMIT 100 RETURN n"
-    )
+@patch("agent.aql_generator.call_llm", new_callable=AsyncMock)
+async def test_generate_aql_for_valid_intent(mock_call):
+    mock_call.return_value = "FOR n IN node FILTER n.kind == 'aws_ec2_instance' LIMIT 100 RETURN n"
     intent = Intent(
         type=IntentType.resource_query,
         entities={"resource_type": "aws_ec2_instance"},
@@ -68,13 +58,9 @@ async def test_generate_aql_for_valid_intent(mock_model_factory):
 
 
 @pytest.mark.asyncio
-@patch("agent.aql_generator.get_aql_model")
-async def test_generate_aql_raises_on_invalid_write(mock_model_factory):
-    mock_model = MagicMock()
-    mock_model_factory.return_value = mock_model
-    mock_model.generate_content.return_value = make_gemini_response(
-        "REMOVE n IN node LIMIT 100"
-    )
+@patch("agent.aql_generator.call_llm", new_callable=AsyncMock)
+async def test_generate_aql_raises_on_invalid_write(mock_call):
+    mock_call.return_value = "REMOVE n IN node LIMIT 100"
     intent = Intent(
         type=IntentType.resource_query,
         entities={},

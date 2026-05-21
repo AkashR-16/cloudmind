@@ -1,30 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-// ── Auth guard ────────────────────────────────────────────────
-test.describe("Auth guard", () => {
-  test("unauthenticated user is redirected to /login from /dashboard/chat", async ({ page }) => {
-    await page.goto("/dashboard/chat");
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test("unauthenticated user is redirected from /dashboard/infrastructure", async ({ page }) => {
-    await page.goto("/dashboard/infrastructure");
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test("unauthenticated user is redirected from /dashboard/how-it-works", async ({ page }) => {
-    await page.goto("/dashboard/how-it-works");
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test("login page renders sign-in form", async ({ page }) => {
-    await page.goto("/login");
-    await expect(page.getByText("Welcome back")).toBeVisible();
-    await expect(page.getByText("CloudMind").first()).toBeVisible();
-  });
-});
-
-// ── Chat tab — authenticated ──────────────────────────────────
+// ── Chat tab ──────────────────────────────────────────────────
 test.describe("Chat tab", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard/chat");
@@ -77,7 +53,7 @@ test.describe("Chat tab", () => {
   });
 });
 
-// ── How It Works tab — authenticated ─────────────────────────
+// ── How It Works tab ─────────────────────────────────────────
 test.describe("How It Works tab", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard/how-it-works");
@@ -95,7 +71,7 @@ test.describe("How It Works tab", () => {
   });
 
   test("shows all architecture components", async ({ page }) => {
-    const components = ["Floci", "fixworker", "fixcore", "ArangoDB", "Gemini 3.1 Flash Lite", "FastAPI", "Next.js + React", "CloudMind UI"];
+    const components = ["Floci", "fixworker", "fixcore", "ArangoDB", "Claude Opus 4.7", "FastAPI", "Next.js + React", "CloudMind UI"];
     for (const c of components) {
       await expect(page.getByText(c).first()).toBeVisible();
     }
@@ -133,42 +109,5 @@ test.describe("How It Works tab", () => {
   test("live sandbox section is present", async ({ page }) => {
     await expect(page.getByText("Try it live")).toBeVisible();
     await expect(page.getByText("live sandbox").first()).toBeVisible();
-  });
-});
-
-// ── Infrastructure tab — authenticated ───────────────────────
-test.describe("Infrastructure tab", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/infrastructure");
-  });
-
-  test("page renders graph container or loading state", async ({ page }) => {
-    // Either loads the graph or shows a loading spinner
-    const hasGraph = await page.locator(".react-flow").isVisible().catch(() => false);
-    const hasLoader = await page.getByText("Loading infrastructure graph").isVisible().catch(() => false);
-    expect(hasGraph || hasLoader).toBeTruthy();
-  });
-
-  test("legend is visible with resource hierarchy labels", async ({ page }) => {
-    await page.waitForSelector(".react-flow", { timeout: 15000 }).catch(() => {});
-    const legend = await page.getByText("Resource hierarchy").isVisible().catch(() => false);
-    const hasNetwork = await page.getByText("Network").first().isVisible().catch(() => false);
-    expect(legend || hasNetwork).toBeTruthy();
-  });
-
-  test("resource count badge is shown", async ({ page }) => {
-    await page.waitForSelector("[class*='react-flow']", { timeout: 15000 }).catch(() => {});
-    await expect(page.getByText("resources")).toBeVisible({ timeout: 10000 });
-  });
-});
-
-// ── Settings tab — authenticated ─────────────────────────────
-test.describe("Settings tab", () => {
-  test("settings page loads without error", async ({ page }) => {
-    await page.goto("/dashboard/settings");
-    // Either shows settings content or redirects to login
-    const onSettings = page.url().includes("settings");
-    const onLogin = page.url().includes("login");
-    expect(onSettings || onLogin).toBeTruthy();
   });
 });

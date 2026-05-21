@@ -36,7 +36,7 @@ const FEATURES = [
     icon: Zap,
     label: "Streaming",
     title: "Answers in real time",
-    description: "Responses stream token-by-token via Gemini AI. No 10-second loading screens, no waiting.",
+    description: "Responses stream token-by-token via Claude AI. No 10-second loading screens, no waiting.",
     gradient: "from-amber-500/15 to-orange-500/15",
     border: "border-amber-500/20",
     iconBg: "bg-amber-500/15 border-amber-500/25",
@@ -77,7 +77,7 @@ const FEATURES = [
 const PIPELINE = [
   { icon: Server, label: "Floci", desc: "Simulates AWS locally", color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
   { icon: Database, label: "FixInventory", desc: "Graphs resources in ArangoDB", color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
-  { icon: Cloud, label: "Gemini AI", desc: "Generates AQL + answer", color: "text-brand-400", bg: "bg-brand-500/10 border-brand-500/20" },
+  { icon: Cloud, label: "Claude AI", desc: "Generates AQL + answer", color: "text-brand-400", bg: "bg-brand-500/10 border-brand-500/20" },
   { icon: MessageSquare, label: "CloudMind", desc: "Streams to you", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
 ];
 
@@ -111,10 +111,7 @@ export default function LandingPage() {
             <span className="font-semibold text-sm tracking-tight">CloudMind</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/login" className="text-sm text-gray-500 hover:text-gray-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.04]">
-              Sign in
-            </Link>
-            <Link href="/login" className="btn-primary text-sm py-2 px-4 rounded-xl">
+            <Link href="/dashboard/chat" className="btn-primary text-sm py-2 px-4 rounded-xl">
               Get started <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -132,7 +129,7 @@ export default function LandingPage() {
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="badge mb-6 text-xs px-4 py-1.5">
             <Zap className="w-3 h-3" />
-            Gemini AI · FixInventory · ArangoDB · Real-time streaming
+            Claude AI · FixInventory · ArangoDB · Real-time streaming
           </div>
 
           <h1 className="text-5xl md:text-[68px] font-bold leading-[1.05] mb-5 tracking-tight">
@@ -147,7 +144,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center gap-3 flex-wrap mb-16">
-            <Link href="/login" className="btn-primary px-6 py-3 text-base rounded-xl">
+            <Link href="/dashboard/chat" className="btn-primary px-6 py-3 text-base rounded-xl">
               Open CloudMind <ArrowRight className="w-4 h-4" />
             </Link>
             <Link href="/dashboard/how-it-works" className="btn-ghost px-6 py-3 text-base rounded-xl">
@@ -299,11 +296,11 @@ export default function LandingPage() {
                 Ask your first question.
               </h2>
               <p className="text-gray-400 text-sm mb-8 leading-relaxed max-w-sm mx-auto">
-                Sign in with any credentials — it's a local demo powered by Floci + FixInventory.
+                Ask questions about your AWS infrastructure.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
-                <Link href="/login" className="btn-primary inline-flex px-6 py-3 text-base rounded-xl">
-                  Start asking questions <ArrowRight className="w-4 h-4" />
+                <Link href="/dashboard/chat" className="btn-primary inline-flex px-6 py-3 text-base rounded-xl">
+                  Open CloudMind <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -319,7 +316,7 @@ export default function LandingPage() {
             </div>
             <span className="text-xs text-gray-600">CloudMind</span>
           </div>
-          <p className="text-xs text-gray-700">FixInventory · ArangoDB · Gemini AI · Next.js · FastAPI</p>
+          <p className="text-xs text-gray-700">FixInventory · ArangoDB · Claude AI · Next.js · FastAPI</p>
         </div>
       </footer>
     </div>

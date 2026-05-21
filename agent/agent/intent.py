@@ -1,5 +1,5 @@
 import json
-from core.gemini_client import get_aql_model
+from core.llm_router import call_llm
 from core.models import Intent, IntentType
 
 _INTENT_PROMPT = """You are an AWS infrastructure assistant intent classifier.
@@ -22,23 +22,19 @@ Respond with valid JSON only. Example:
 """
 
 
-async def classify_intent(question: str, history: list | None = None) -> Intent:
-    model = get_aql_model()
+async def classify_intent(question: str, history: list | None = None, api_key: str | None = None, provider: str | None = None) -> Intent:
     history_block = ""
     if history:
-        recent = history[-4:]  # last 2 turns (user+assistant pairs)
+        recent = history[-4:]  # last 2 turns
         lines = "\n".join(f"{m.role}: {m.content[:200]}" for m in recent)
         history_block = f"Recent conversation:\n{lines}\n\n"
+
+    prompt = _INTENT_PROMPT.format(question=question, history_block=history_block)
+
     try:
-        response = model.generate_content(
-            _INTENT_PROMPT.format(question=question, history_block=history_block)
-        )
+        text = await call_llm(prompt, api_key=api_key, provider=provider)
     except Exception as e:
-        err = str(e)
-        if "RESOURCE_EXHAUSTED" in err or "quota" in err.lower():
-            raise RuntimeError("RESOURCE_EXHAUSTED: Gemini quota exceeded")
-        raise
-    text = response.text.strip()
+        raise RuntimeError(f"LLM error: {e}") from e
 
     # Strip markdown code fences if present
     if text.startswith("```"):
@@ -51,7 +47,7 @@ async def classify_intent(question: str, history: list | None = None) -> Intent:
         data = json.loads(text)
         return Intent(
             type=IntentType(data.get("intent", "unknown")),
-            entities=data.get("entities", {}),
+            entities=data.get("entities") or {},
             raw_question=question,
         )
     except (json.JSONDecodeError, ValueError):

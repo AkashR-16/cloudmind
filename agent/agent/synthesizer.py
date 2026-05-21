@@ -1,6 +1,6 @@
 import json
 from typing import AsyncIterator
-from core.gemini_client import get_model
+from core.llm_router import stream_llm
 from core.models import ChatMessage, Intent
 
 _SYSTEM_PROMPT = """You are CloudMind, an expert AI assistant specializing in AWS cloud infrastructure.
@@ -23,15 +23,15 @@ def _build_messages(
     db_results: list,
     history: list[ChatMessage],
     aql_error: str | None = None,
-) -> list[dict]:
+) -> tuple[str, list[dict]]:
     if aql_error:
-        data_str = f"QUERY FAILED — unable to retrieve data. Do not say 'no resources found'. Instead say the query could not be completed and ask the user to rephrase."
+        data_str = "QUERY FAILED — unable to retrieve data. Do not say 'no resources found'. Instead say the query could not be completed and ask the user to rephrase."
     elif db_results:
         data_str = json.dumps(db_results, indent=2)
     else:
         data_str = "No matching resources found."
 
-    system_with_data = (
+    system = (
         f"{_SYSTEM_PROMPT}\n\n"
         f"=== Query Context ===\n"
         f"Question: {intent.raw_question}\n"
@@ -43,15 +43,24 @@ def _build_messages(
         f"matching the query filters above. Use it to answer the question directly.\n"
     )
 
-    messages = [{"role": "user", "parts": [system_with_data]},
-                {"role": "model", "parts": ["Understood. I'll answer questions based on this AWS environment data."]}]
-
+    messages: list[dict] = []
     for msg in history:
-        role = "user" if msg.role == "user" else "model"
-        messages.append({"role": role, "parts": [msg.content]})
+        role = "user" if msg.role == "user" else "assistant"
+        messages.append({"role": role, "content": msg.content})
+    messages.append({"role": "user", "content": intent.raw_question})
+    return system, messages
 
-    messages.append({"role": "user", "parts": [intent.raw_question]})
-    return messages
+
+def _build_cli_prompt(system: str, messages: list[dict]) -> str:
+    """Combine system prompt + conversation history into a single CLI prompt string."""
+    parts = [system, "\n\n"]
+    for msg in messages[:-1]:
+        label = "User" if msg["role"] == "user" else "Assistant"
+        parts.append(f"{label}: {msg['content']}\n")
+    if len(messages) > 1:
+        parts.append("\n")
+    parts.append(f"User: {messages[-1]['content']}")
+    return "".join(parts)
 
 
 async def synthesize_stream(
@@ -59,14 +68,13 @@ async def synthesize_stream(
     db_results: list,
     history: list[ChatMessage],
     aql_error: str | None = None,
+    api_key: str | None = None,
+    provider: str | None = None,
 ) -> AsyncIterator[str]:
-    model = get_model()
-    messages = _build_messages(intent, db_results, history, aql_error=aql_error)
-
-    response = model.generate_content(messages, stream=True)
-    for chunk in response:
-        if chunk.text:
-            yield chunk.text
+    system, messages = _build_messages(intent, db_results, history, aql_error=aql_error)
+    prompt = _build_cli_prompt(system, messages)
+    async for chunk in stream_llm(prompt, api_key=api_key, provider=provider):
+        yield chunk
 
 
 async def synthesize_unknown(question: str) -> AsyncIterator[str]:

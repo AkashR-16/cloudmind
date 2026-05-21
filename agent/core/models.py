@@ -13,9 +13,17 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class LLMProvider(str, Enum):
+    gemini = "gemini"
+    openai = "openai"
+    anthropic = "anthropic"
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: str = Field(..., min_length=1, max_length=128)
+    api_key: str | None = Field(default=None, max_length=512)
+    provider: LLMProvider | None = Field(default=None)
 
 
 class SessionResponse(BaseModel):

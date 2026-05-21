@@ -1,21 +1,48 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useChat } from "@/features/chat/useChat";
+import { useApiKey } from "@/features/apikey/useApiKey";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { SuggestedPrompts } from "./SuggestedPrompts";
+import { ApiKeyBanner } from "./ApiKeyBanner";
 import { Cloud, Zap, RotateCcw } from "lucide-react";
 
 export function ChatWindow() {
-  const { messages, isLoading, error, sendMessage, clearSession } = useChat();
+  const { apiKey, provider, dismissed, setApiKey, setProvider, dismiss } = useApiKey();
+  const { messages, isLoading, error, sendMessage, clearSession } = useChat(apiKey, provider);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Show banner when backend signals no API key (deployed mode, no key configured)
+  useEffect(() => {
+    if (error?.includes("No API key")) {
+      setShowBanner(true);
+    }
+  }, [error]);
+
+  // Hide banner once a key is saved
+  useEffect(() => {
+    if (apiKey) setShowBanner(false);
+  }, [apiKey]);
+
+  const handleKeySave = (key: string, p: import("@/features/apikey/useApiKey").LLMProvider) => {
+    setApiKey(key, p);
+    setShowBanner(false);
+  };
+
+  const handleDismiss = () => {
+    dismiss();
+    setShowBanner(false);
+  };
+
   const isEmpty = messages.length === 0;
+  const bannerVisible = showBanner && !apiKey && !dismissed;
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] relative">
@@ -38,11 +65,16 @@ export function ChatWindow() {
       </div>
 
       {/* Error banner */}
-      {error && (
+      {error && !error.includes("No API key") && (
         <div className="mx-4 mb-2 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-xl text-red-400 text-sm text-center flex items-center justify-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
           {error}
         </div>
+      )}
+
+      {/* API key banner */}
+      {bannerVisible && (
+        <ApiKeyBanner onSave={handleKeySave} onDismiss={handleDismiss} initialProvider={provider} />
       )}
 
       {/* Input */}
