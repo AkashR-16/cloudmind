@@ -44,7 +44,11 @@ FixInventory ArangoDB schema (populated from Floci local AWS simulator):
     reported.runtime: string — Lambda runtime (e.g. "python3.12")
     reported.memory_size: int — Lambda memory in MB
     reported.group_name: string — security group name
-    reported.ip_permissions: array — security group inbound rules
+    reported.ip_permissions: array of objects — security group inbound rules, each object has:
+        from_port: int — start of port range
+        to_port: int — end of port range
+        ip_protocol: string — "tcp", "udp", "-1" (all)
+        ip_ranges: array of objects, each with cidr_ip: string (e.g. "0.0.0.0/0")
     reported.cidr_block: string — VPC or subnet CIDR block
     reported.assume_role_policy: string — IAM role trust principal (e.g. "ec2.amazonaws.com")
 """
@@ -70,9 +74,10 @@ def _build_aql_prompt(vertex_col: str, edge_col: str, schema: str, limit: int,
         f"     RETURN {{kind: v.{kf}, name: v.reported.name}}\n"
         f"4. Return only fields needed. Output ONLY the AQL — no markdown, no explanation.\n"
         f"5. CRITICAL — nested array filtering: ArangoDB does NOT support `array ANY == value` on arrays of objects.\n"
-        f"   For ip_permissions (array of objects each with IpRanges array), you MUST use nested FOR loops:\n"
-        f"   LENGTH(FOR perm IN n.reported.ip_permissions FOR cidr IN perm.IpRanges FILTER cidr.CidrIp == \"0.0.0.0/0\" RETURN 1) > 0\n"
-        f"   Never write: ip_permissions ANY == ... or IpRanges ANY == ...\n\n"
+        f"   For ip_permissions, use nested FOR loops with PARENTHESISED LENGTH((...)):\n"
+        f"   FILTER LENGTH((FOR perm IN n.reported.ip_permissions FOR cidr IN perm.ip_ranges FILTER cidr.cidr_ip == \"0.0.0.0/0\" RETURN 1)) > 0\n"
+        f"   Field names are snake_case: from_port, to_port, ip_ranges, cidr_ip — NOT CamelCase.\n"
+        f"   Never write: ip_permissions ANY == ... or ip_ranges ANY == ...\n\n"
         f"Examples:\n"
         f"- \"How many EC2 instances?\" ->\n"
         f"  RETURN LENGTH(FOR n IN {vertex_col} FILTER n.{kf} == \"aws_ec2_instance\" RETURN 1)\n"
@@ -84,11 +89,11 @@ def _build_aql_prompt(vertex_col: str, edge_col: str, schema: str, limit: int,
         f"  FOR n IN {vertex_col} FILTER n.{kf} == \"aws_iam_role\" LIMIT {limit} RETURN {{name: n.reported.name, principal: n.reported.assume_role_policy}}\n"
         f"- \"Which security groups allow inbound 0.0.0.0/0?\" ->\n"
         f"  FOR n IN {vertex_col} FILTER n.{kf} == \"aws_security_group\"\n"
-        f"  AND LENGTH(FOR perm IN n.reported.ip_permissions FOR cidr IN perm.IpRanges FILTER cidr.CidrIp == \"0.0.0.0/0\" RETURN 1) > 0\n"
+        f"  FILTER LENGTH((FOR perm IN n.reported.ip_permissions FOR cidr IN perm.ip_ranges FILTER cidr.cidr_ip == \"0.0.0.0/0\" RETURN 1)) > 0\n"
         f"  LIMIT {limit} RETURN {{name: n.reported.name, id: n.reported.id, region: n.reported.region, ports: n.reported.ip_permissions}}\n"
         f"- \"Which security groups allow port 22?\" ->\n"
         f"  FOR n IN {vertex_col} FILTER n.{kf} == \"aws_security_group\"\n"
-        f"  AND LENGTH(FOR perm IN n.reported.ip_permissions FILTER perm.FromPort <= 22 AND perm.ToPort >= 22 RETURN 1) > 0\n"
+        f"  FILTER LENGTH((FOR perm IN n.reported.ip_permissions FILTER perm.from_port <= 22 AND perm.to_port >= 22 RETURN 1)) > 0\n"
         f"  LIMIT {limit} RETURN {{name: n.reported.name, id: n.reported.id, region: n.reported.region}}\n\n"
         f"Question: {question}\n"
         f"Intent: {intent}\n"
@@ -106,29 +111,49 @@ _FORBIDDEN_PATTERNS = [
 ]
 
 # AQL patterns that are syntactically invalid in ArangoDB for object-arrays.
-# ArangoDB supports `ANY ==` only on scalar arrays, not on arrays of objects.
 _INVALID_ARRAY_PATTERNS = [
-    # ip_permissions ANY == "value"  (object array, not scalar)
     r"ip_permissions\s+ANY\s*==",
-    # IpRanges ANY == "value" — same issue
+    r"ip_ranges\s+ANY\s*==",
     r"IpRanges\s+ANY\s*==",
 ]
 
+# CamelCase field names the LLM might emit — map to actual snake_case names in the data.
+_CAMEL_FIXES = [
+    (r"\bFromPort\b",   "from_port"),
+    (r"\bToPort\b",     "to_port"),
+    (r"\bIpRanges\b",   "ip_ranges"),
+    (r"\bCidrIp\b",     "cidr_ip"),
+    (r"\bIpProtocol\b", "ip_protocol"),
+]
 
 def sanitize_aql(query: str, vertex_col: str, edge_col: str, limit: int) -> str:
     """Replace known-invalid AQL patterns with correct equivalents."""
     kf = _kind_field(vertex_col)
 
+    # Fix CamelCase field names → snake_case
+    for pattern, replacement in _CAMEL_FIXES:
+        query = re.sub(pattern, replacement, query)
+
+    # In FILTER clauses, ArangoDB requires LENGTH((subquery)) with double parens.
+    # Only apply to LENGTH(FOR...) > 0 patterns (filter context), NOT to
+    # top-level RETURN LENGTH(FOR...) which is already valid without double parens.
+    query = re.sub(
+        r"\bLENGTH\(\s*(FOR\b.*?RETURN\s+1)\s*\)\s*>\s*0",
+        r"LENGTH((\1)) > 0",
+        query,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    # Replace ANY == on object arrays with a safe nested loop
     for pattern in _INVALID_ARRAY_PATTERNS:
         if re.search(pattern, query, re.IGNORECASE):
-            # Extract CIDR value if present, else default to 0.0.0.0/0
             cidr_match = re.search(r'"([0-9./]+)"', query)
             cidr = cidr_match.group(1) if cidr_match else "0.0.0.0/0"
             return (
                 f'FOR n IN {vertex_col} FILTER n.{kf} == "aws_security_group" '
-                f'AND LENGTH(FOR perm IN n.reported.ip_permissions '
-                f'FOR cidr IN perm.IpRanges '
-                f'FILTER cidr.CidrIp == "{cidr}" RETURN 1) > 0 '
+                f'FILTER LENGTH((FOR perm IN n.reported.ip_permissions '
+                f'FOR cidr IN perm.ip_ranges '
+                f'FILTER cidr.cidr_ip == "{cidr}" RETURN 1)) > 0 '
                 f'LIMIT {limit} '
                 f'RETURN {{name: n.reported.name, id: n.reported.id, '
                 f'region: n.reported.region, ip_permissions: n.reported.ip_permissions}}'
