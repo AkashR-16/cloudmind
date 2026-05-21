@@ -22,6 +22,9 @@ function makeStreamResponse(chunks: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // useChat hydrates from localStorage on mount — clear it between tests so
+  // state from one test does not leak into the next.
+  if (typeof window !== "undefined") window.localStorage.clear();
 });
 
 describe("useChat", () => {

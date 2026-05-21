@@ -7,6 +7,7 @@ import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { SuggestedPrompts } from "./SuggestedPrompts";
 import { ApiKeyBanner } from "./ApiKeyBanner";
+import { QuestionsSidebar } from "./QuestionsSidebar";
 import { Cloud, Zap, RotateCcw } from "lucide-react";
 
 export function ChatWindow() {
@@ -45,55 +46,61 @@ export function ChatWindow() {
   const bannerVisible = showBanner && !apiKey && !dismissed;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] relative">
-      {/* Background orb */}
-      <div className="orb w-[500px] h-[500px] bg-brand-500/5 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+    <div className="flex h-[calc(100vh-7rem)] relative">
+      <QuestionsSidebar onSelect={sendMessage} disabled={isLoading} />
 
-      {/* Message area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 relative">
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-fade-in space-y-8">
-            <EmptyState />
-            <SuggestedPrompts onSelect={sendMessage} />
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-1">
-            <MessageList messages={messages} />
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
+      <div className="flex-1 flex flex-col relative min-w-0">
+        {/* Background orb */}
+        <div className="orb w-[500px] h-[500px] bg-brand-500/5 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
 
-      {/* Error banner */}
-      {error && !error.includes("No API key") && (
-        <div className="mx-4 mb-2 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-xl text-red-400 text-sm text-center flex items-center justify-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* API key banner */}
-      {bannerVisible && (
-        <ApiKeyBanner onSave={handleKeySave} onDismiss={handleDismiss} initialProvider={provider} />
-      )}
-
-      {/* Input */}
-      <div className="relative px-4 pb-4 pt-2">
-        {/* Fade gradient above input */}
-        <div className="absolute -top-8 inset-x-0 h-8 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
-        <div className="max-w-3xl mx-auto space-y-2">
-          <InputBar onSend={sendMessage} isLoading={isLoading} />
-          {messages.length > 0 && (
-            <div className="flex justify-center">
-              <button
-                onClick={clearSession}
-                className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-400 transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Clear conversation
-              </button>
+        {/* Message area */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 relative">
+          {isEmpty ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-fade-in space-y-8">
+              <EmptyState />
+              <div className="lg:hidden w-full">
+                <SuggestedPrompts onSelect={sendMessage} />
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-1">
+              <MessageList messages={messages} />
+              <div ref={bottomRef} />
             </div>
           )}
+        </div>
+
+        {/* Error banner */}
+        {error && !error.includes("No API key") && (
+          <div className="mx-4 mb-2 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-xl text-red-400 text-sm text-center flex items-center justify-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* API key banner */}
+        {bannerVisible && (
+          <ApiKeyBanner onSave={handleKeySave} onDismiss={handleDismiss} initialProvider={provider} />
+        )}
+
+        {/* Input */}
+        <div className="relative px-4 pb-4 pt-2">
+          {/* Fade gradient above input */}
+          <div className="absolute -top-8 inset-x-0 h-8 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
+          <div className="max-w-3xl mx-auto space-y-2">
+            <InputBar onSend={sendMessage} isLoading={isLoading} />
+            {messages.length > 0 && (
+              <div className="flex justify-center">
+                <button
+                  onClick={clearSession}
+                  className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Clear conversation
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

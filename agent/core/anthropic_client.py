@@ -1,7 +1,7 @@
 import anthropic
 from typing import AsyncIterator
 
-_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
+_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 
 async def call_anthropic(prompt: str, api_key: str) -> str:

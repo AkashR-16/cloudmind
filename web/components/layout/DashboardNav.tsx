@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, HelpCircle } from "lucide-react";
+import { MessageSquare, HelpCircle, Network, Settings as SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/how-it-works", label: "How It Works", icon: HelpCircle },
+  { href: "/dashboard/architecture", label: "Architecture", icon: Network },
+  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function DashboardNav() {

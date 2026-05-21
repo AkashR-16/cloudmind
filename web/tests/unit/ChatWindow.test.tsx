@@ -10,6 +10,11 @@ beforeAll(() => {
 // Mock useChat before importing the component so the mock is in place when
 // ChatWindow's module is evaluated.
 vi.mock("@/features/chat/useChat");
+// QuestionsSidebar contains the same prompt strings as SuggestedPrompts; mocking
+// it out keeps these tests focused on the SuggestedPrompts empty-state behavior.
+vi.mock("@/app/(app)/dashboard/chat/_components/QuestionsSidebar", () => ({
+  QuestionsSidebar: () => null,
+}));
 import { useChat } from "@/features/chat/useChat";
 import { ChatWindow } from "@/app/(app)/dashboard/chat/_components/ChatWindow";
 

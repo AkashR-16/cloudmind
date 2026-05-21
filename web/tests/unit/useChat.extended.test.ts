@@ -24,6 +24,8 @@ function makeStreamResponse(chunks: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // useChat hydrates from localStorage on mount — clear between tests.
+  if (typeof window !== "undefined") window.localStorage.clear();
 });
 
 // ── isLoading lifecycle ──────────────────────────────────────────

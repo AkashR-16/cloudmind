@@ -26,6 +26,9 @@ class ChatRequest(BaseModel):
     provider: LLMProvider | None = Field(default=None)
 
 
+class TestKeyRequest(BaseModel):
+    api_key: str = Field(..., min_length=1, max_length=512)
+    provider: LLMProvider = Field(default=LLMProvider.anthropic)
 class SessionResponse(BaseModel):
     session_id: str
     turn_count: int

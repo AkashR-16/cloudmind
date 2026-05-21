@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 import redis.asyncio as aioredis
 
-from core.models import ChatRequest, ChatMessage, MessageRole
+from core.models import ChatRequest, ChatMessage, MessageRole, TestKeyRequest, LLMProvider
 from core.config import get_settings
 from core.arango_client import get_db, execute_aql
 from core.redis_client import get_redis, load_context, save_context
-from core.llm_router import is_local_mode
+from core.llm_router import is_local_mode, call_llm
 from agent.intent import classify_intent
 from agent.aql_generator import generate_aql
 from agent.synthesizer import synthesize_stream, synthesize_unknown
@@ -85,7 +85,22 @@ async def chat(request: ChatRequest):
     if not is_local_mode() and not request.api_key:
         raise HTTPException(
             status_code=401,
-            detail="No API key provided. Enter your Gemini API key to use CloudMind.",
+            detail="No API key provided. Add your Anthropic API key in Settings to use CloudMind.",
         )
 
     return await _stream_response(request)
+@router.get("/mode")
+async def mode():
+    """Tells the frontend whether the backend is in local-CLI mode or needs an API key."""
+    return {"local": is_local_mode()}
+@router.post("/test-key")
+async def test_key(req: TestKeyRequest):
+    """Validates a user-supplied API key by making a minimal LLM call."""
+    try:
+        await call_llm("ping", api_key=req.api_key, provider=req.provider.value)
+        return {"ok": True, "provider": req.provider.value}
+    except Exception as e:
+        msg = str(e)
+        if len(msg) > 240:
+            msg = msg[:240] + "…"
+        raise HTTPException(status_code=400, detail=msg or "Key validation failed")
